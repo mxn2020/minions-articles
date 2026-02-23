@@ -1,126 +1,185 @@
 ---
 name: minions-articles
-description: Agent skills for working with Minions Articles MinionTypes. Provides CRUD operations, CLI usage, and best practices for AI agents managing minions-articles data.
+description: Article drafts, revisions, SEO metadata, and publish status
 ---
 
-# Minions Articles Agent Skills
+# minions-articles — Agent Skills
 
-Skills for agents operating on the `minions-articles` toolbox.
+## What is an Article in the Minions Context?
 
-## Prerequisites
+Before defining types, it's worth being precise:
 
-Install the SDK and CLI:
+```
+a blog post with its content and metadata   → Article
+a versioned snapshot of an article          → ArticleRevision
+SEO optimization data                       → SeoMetadata
+quality and SEO scoring                     → ArticleScore
+```
+
+---
+
+## MinionTypes
+
+**Core**
+```ts
+// article
+{
+  type: "article",
+  fields: {
+    blogId: string,
+    briefId: string,
+    title: string,
+    slug: string,
+    body: string,                    // markdown content
+    excerpt: string,
+    wordCount: number,
+    readingTimeMinutes: number,
+    status: "draft" | "review" | "approved" | "published" | "archived",
+    authorId: string,
+    createdAt: datetime,
+    publishedAt: datetime
+  }
+}
+
+// article-revision
+{
+  type: "article-revision",
+  fields: {
+    articleId: string,
+    version: number,
+    body: string,
+    changedBy: string,
+    changeNotes: string,
+    createdAt: datetime
+  }
+}
+
+// seo-metadata
+{
+  type: "seo-metadata",
+  fields: {
+    articleId: string,
+    metaTitle: string,
+    metaDescription: string,
+    canonicalUrl: string,
+    ogImage: string,
+    schemaMarkup: string,
+    internalLinks: string[],
+    externalLinks: string[]
+  }
+}
+
+// article-score
+{
+  type: "article-score",
+  fields: {
+    articleId: string,
+    readabilityScore: number,
+    seoScore: number,
+    originalityScore: number,
+    overallScore: number,
+    suggestions: string[],
+    scoredAt: datetime,
+    scoredBy: string
+  }
+}
+```
+
+---
+
+## Relations
+
+```
+article            --created_from-->     content-brief (minions-content-research)
+article            --has_revision-->     article-revision
+article            --has_seo-->         seo-metadata
+article            --scored_by-->       article-score
+article            --published_via-->   publish-receipt (minions-publishing)
+article            --belongs_to-->      blog (minions-blogs)
+```
+
+---
+
+## How It Connects to Other Toolboxes
+
+```
+minions-content-research  → articles are created from content-briefs
+minions-blogs             → articles belong to a blog and follow its guidelines
+minions-publishing        → approved articles enter the publish queue
+minions-approvals         → articles in "review" status create approval requests
+minions-documents         → article revisions provide full version history
+```
+
+---
+
+## Agent SKILLS for `minions-articles`
+
+```markdown
+# WriterAgent Skills
+
+## Context
+You write, revise, and optimize articles. You take content briefs
+and produce publication-ready articles that match the blog's brand
+guidelines and target the specified keywords.
+
+## Skill: Write Article
+1. Load content-brief and blog brand-guidelines
+2. Write article body following the brief outline
+3. Create article-revision (version 1)
+4. Generate seo-metadata (metaTitle, metaDescription, etc.)
+5. Run article-score evaluation
+6. Set status to "review"
+
+## Skill: Revise Article
+1. On feedback: create new article-revision with incremented version
+2. Re-run article-score
+3. If score improves, update main article body
+
+## Skill: Optimize SEO
+1. Analyze keyword placement, heading structure, link density
+2. Update seo-metadata
+3. Suggest internal linking opportunities
+
+## Hard Rules
+- Every article must trace to a content-brief
+- Every edit creates an article-revision — never overwrite without versioning
+- Articles must score above threshold before moving to "approved"
+```
+
+
+---
+
+## CLI Reference
+
+Install globally:
 
 ```bash
-# TypeScript
-pnpm add @minions-articles/sdk
-
-# Python
-pip install minions-articles
-
-# CLI
 pnpm add -g @minions-articles/cli
 ```
 
----
+Set `MINIONS_STORE` env var to control where data is stored (default: `.minions/`).
 
-## Using the CLI
-
-The `articles` CLI provides basic project info and utilities:
+### Discover Types
 
 ```bash
-# Show project info (SDK name, CLI name, Python package)
-articles info
+articles types list
+articles types show <type-slug>
 ```
 
-Use the CLI as the primary interface for scripted operations. For programmatic access within agent code, use the SDK directly.
+### CRUD
 
----
-
-## Using the SDK
-
-### TypeScript
-
-```ts
-import { customTypes } from '@minions-articles/sdk/schemas';
-
-// List all available MinionTypes in this toolbox
-for (const type of customTypes) {
-  console.log(`${type.icon} ${type.name} (${type.slug})`);
-  console.log(`  ${type.description}`);
-  console.log(`  Fields: ${type.schema.map(f => f.name).join(', ')}`);
-}
-
-// Access a specific type
-const myType = customTypes.find(t => t.slug === 'YOUR_TYPE_SLUG');
+```bash
+articles create <type> -t "Title" -s "status"
+articles list <type>
+articles show <id>
+articles update <id> --data '{ "status": "active" }'
+articles delete <id>
+articles search "query"
 ```
 
-### Python
+### Stats & Validation
 
-```python
-from minions_articles.schemas import custom_types
-
-# List all available MinionTypes
-for t in custom_types:
-    print(f"{t.icon} {t.name} ({t.slug})")
-    print(f"  {t.description}")
+```bash
+articles stats
+articles validate ./my-minion.json
 ```
-
----
-
-## Skill: Create Minion
-
-When creating a new Minion of any type in this toolbox:
-
-1. Look up the MinionType from `customTypes` by slug
-2. Validate all required fields are present according to the schema
-3. Set `string` fields to their values, `number` fields to numeric values
-4. Set `select` fields to one of their valid options
-5. Set `boolean` fields to `true` or `false`
-6. Always include a timestamp for any `createdAt` or similar fields (ISO 8601 format)
-
----
-
-## Skill: Read / Query Minions
-
-When reading or searching for Minions:
-
-1. Query by MinionType slug to filter by type
-2. Use field values for secondary filtering
-3. For references (fields ending in `Id`), resolve the linked Minion for full context
-4. Return results in a structured format the calling agent can parse
-
----
-
-## Skill: Update Minion
-
-When updating an existing Minion:
-
-1. Load the current Minion by ID
-2. Validate the update against the MinionType schema
-3. Only modify the fields that need changing — preserve existing values
-4. If the type has a `status` field, follow valid status transitions
-5. If the type has an `updatedAt` field, set it to the current timestamp
-6. Log significant field changes for audit if the context requires it
-
----
-
-## Skill: Delete / Archive Minion
-
-When removing a Minion:
-
-1. Prefer soft-delete: set `status` to `"cancelled"` or `"archived"` if available
-2. Never hard-delete Minions that other Minions reference via ID fields
-3. Check for dependent Minions before any destructive operation
-4. If hard-delete is required, ensure all references are cleaned up first
-
----
-
-## Hard Rules
-
-- Every Minion MUST conform to its MinionType schema
-- All `select` fields must use valid option values
-- All ID reference fields must point to existing Minions
-- Timestamps must be in ISO 8601 format
-- Never create orphaned Minions — always set reference fields when applicable
-- This agent only writes to `minions-articles` — it reads from other toolboxes but never writes to them
