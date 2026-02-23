@@ -1,6 +1,12 @@
 ---
 name: minions-articles
-description: Article drafts, revisions, SEO metadata, and publish status
+id: OC-0106
+version: 1.0.0
+description: "Article drafts, revisions, SEO metadata, and publish status"
+category: productivity
+subcategory: publishing
+tags: ["minion", "productivity", "publishing"]
+comments:
 ---
 
 # minions-articles — Agent Skills
