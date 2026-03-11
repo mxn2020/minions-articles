@@ -1,0 +1,8 @@
+name: "@minions-articles/cli"
+project_scope: child
+child_type: cli
+parent_project: minions-articles-workspace
+description: "CLI for minions-articles — Article drafts, revisions, SEO metadata, and publish status"
+priority: high
+deploy_url: null
+tags: null
