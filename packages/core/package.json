@@ -1,6 +1,6 @@
 {
   "name": "@minions-articles/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Article drafts, revisions, SEO metadata, and publish status",
   "type": "module",
   "main": "./dist/index.js",
